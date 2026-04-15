@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="screen-orientation" content="portrait">
+  <title>Magic Forest Counting</title>
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #B8E4F7;
+      touch-action: manipulation;
+    }
+
+    /* ── Scene container (390×844 logical canvas) ───────────── */
+    #scene {
+      position: relative;
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      transform-origin: top center;
+    }
+
+    /* ── SVG layers ─────────────────────────────────────────── */
+    #background {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    #tree-scene {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      transform-origin: bottom center;
+    }
+
+    /* ── Counter dots bar ───────────────────────────────────── */
+    #counter-bar {
+      position: absolute;
+      bottom: 118px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      background: rgba(255,255,255,0.45);
+      border-radius: 30px;
+      padding: 8px 16px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12), inset 0 2px 4px rgba(255,255,255,0.6);
+    }
+
+    /* ── Control buttons ────────────────────────────────────── */
+    #controls {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 32px;
+      z-index: 2;
+    }
+
+    #btn-plus, #btn-minus {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow:
+        0 6px 0 rgba(0,0,0,0.22),
+        0 10px 20px rgba(0,0,0,0.18),
+        inset 0 3px 8px rgba(255,255,255,0.45);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.25s ease;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
+
+    #btn-plus {
+      background: radial-gradient(circle at 35% 32%, #a0e8ff, #5BC8F5);
+    }
+
+    #btn-minus {
+      background: radial-gradient(circle at 35% 32%, #ffe99a, #FFD54F);
+    }
+
+    #btn-plus:active, #btn-minus:active {
+      transform: scale(0.90) translateY(4px);
+      box-shadow:
+        0 2px 0 rgba(0,0,0,0.22),
+        0 4px 10px rgba(0,0,0,0.15),
+        inset 0 3px 8px rgba(255,255,255,0.45);
+    }
+
+    /* ── Apple glow pulse (CSS scaleY trick for SVG compat) ─── */
+    @keyframes applePulse {
+      0%,100% { transform: scale(1);    opacity: 0.55; }
+      50%      { transform: scale(1.28); opacity: 0.85; }
+    }
+
+    .apple-glow {
+      transform-origin: 0px 0px;
+      transform-box: fill-box;
+      animation: applePulse 2.4s ease-in-out infinite;
+    }
+
+    .apple-0 .apple-glow { animation-delay: 0.00s; }
+    .apple-1 .apple-glow { animation-delay: 0.48s; }
+    .apple-2 .apple-glow { animation-delay: 0.96s; }
+    .apple-3 .apple-glow { animation-delay: 1.44s; }
+    .apple-4 .apple-glow { animation-delay: 1.92s; }
+
+    /* ── Owl blink ──────────────────────────────────────────── */
+    @keyframes owlBlink {
+      0%,90%,100% { transform: scaleY(1);    }
+      95%          { transform: scaleY(0.07); }
+    }
+
+    .owl-pupil-l, .owl-pupil-r {
+      transform-box: fill-box;
+      transform-origin: center center;
+      animation: owlBlink 3.5s ease-in-out infinite;
+    }
+    .owl-pupil-r { animation-delay: 0.06s; }
+
+    /* ── Owl mood animations ────────────────────────────────── */
+    @keyframes owlBounce {
+      0%   { transform: translate(0,0)    rotate(0deg)  scale(1);    }
+      25%  { transform: translate(0,-16px) rotate(-7deg) scale(1.12); }
+      55%  { transform: translate(0,2px)  rotate(0deg)  scale(0.93); }
+      75%  { transform: translate(0,-9px)  rotate(5deg)  scale(1.06); }
+      100% { transform: translate(0,0)    rotate(0deg)  scale(1);    }
+    }
+
+    @keyframes owlShrug {
+      0%   { transform: rotate(0deg)  scale(1);    }
+      20%  { transform: rotate(-9deg) scale(0.93); }
+      50%  { transform: rotate(9deg)  scale(0.93); }
+      80%  { transform: rotate(-4deg) scale(0.97); }
+      100% { transform: rotate(0deg)  scale(1);    }
+    }
+
+    @keyframes owlDance {
+      0%   { transform: translate(0,0)     rotate(0deg)   scale(1);    }
+      12%  { transform: translate(-7px,-20px) rotate(-14deg) scale(1.18); }
+      28%  { transform: translate(7px,-20px)  rotate(14deg)  scale(1.18); }
+      44%  { transform: translate(-4px,-12px) rotate(-7deg)  scale(1.08); }
+      60%  { transform: translate(4px,-12px)  rotate(7deg)   scale(1.08); }
+      80%  { transform: translate(0,-6px)   rotate(0deg)   scale(1.12); }
+      100% { transform: translate(0,0)     rotate(0deg)   scale(1);    }
+    }
+
+    #owl.owl-happy {
+      animation: owlBounce 0.62s ease-in-out 1;
+      transform-box: fill-box;
+      transform-origin: center bottom;
+    }
+    #owl.owl-sad {
+      animation: owlShrug 0.52s ease-in-out 1;
+      transform-box: fill-box;
+      transform-origin: center center;
+    }
+    #owl.owl-dance {
+      animation: owlDance 1.05s ease-in-out 1;
+      transform-box: fill-box;
+      transform-origin: center bottom;
+    }
+
+    /* ── Tree bop (squash-stretch) ──────────────────────────── */
+    @keyframes treeBop {
+      0%   { transform: scaleY(1)    scaleX(1);    }
+      28%  { transform: scaleY(0.94) scaleX(1.05); }
+      60%  { transform: scaleY(1.04) scaleX(0.97); }
+      100% { transform: scaleY(1)    scaleX(1);    }
+    }
+
+    #tree-scene.tree-bop {
+      animation: treeBop 0.42s ease-in-out 1;
+    }
+  </style>
+</head>
+<body>
+
+<div id="scene">
+
+  <!-- ── LAYER 1: Background ──────────────────────────────── -->
+  <svg id="background" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice"
+       xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#B8E4F7"/>
+        <stop offset="100%" stop-color="#E8F7D4"/>
+      </linearGradient>
+      <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="#8BC34A"/>
+        <stop offset="100%" stop-color="#558B2F"/>
+      </linearGradient>
+      <!-- Soft cloud blurs -->
+      <filter id="cloudBlur"><feGaussianBlur stdDeviation="6"/></filter>
+    </defs>
+
+    <!-- Sky -->
+    <rect width="390" height="844" fill="url(#skyGrad)"/>
+
+    <!-- Distant tree silhouettes -->
+    <g opacity="0.48">
+      <ellipse cx="48"  cy="622" rx="34" ry="60"  fill="#7BAAA0"/>
+      <rect    x="43"   y="668"  width="10" height="60" rx="5" fill="#7BAAA0"/>
+      <ellipse cx="118" cy="638" rx="26" ry="44"  fill="#7BAAA0"/>
+      <rect    x="114"  y="672"  width="8"  height="50" rx="4" fill="#7BAAA0"/>
+      <ellipse cx="318" cy="628" rx="30" ry="52"  fill="#7BAAA0"/>
+      <rect    x="314"  y="670"  width="8"  height="58" rx="4" fill="#7BAAA0"/>
+      <ellipse cx="368" cy="648" rx="20" ry="36"  fill="#7BAAA0"/>
+      <rect    x="365"  y="676"  width="6"  height="40" rx="3" fill="#7BAAA0"/>
+    </g>
+
+    <!-- Fluffy clouds -->
+    <g filter="url(#cloudBlur)" opacity="0.8">
+      <ellipse cx="80"  cy="140" rx="54" ry="26" fill="white"/>
+      <ellipse cx="110" cy="130" rx="40" ry="30" fill="white"/>
+      <ellipse cx="55"  cy="148" rx="32" ry="22" fill="white"/>
+    </g>
+    <g filter="url(#cloudBlur)" opacity="0.7">
+      <ellipse cx="290" cy="110" rx="48" ry="22" fill="white"/>
+      <ellipse cx="316" cy="100" rx="36" ry="28" fill="white"/>
+      <ellipse cx="268" cy="118" rx="28" ry="18" fill="white"/>
+    </g>
+
+    <!-- Ground wave -->
+    <path d="M0 740 Q100 715 195 728 Q290 741 390 722 L390 844 L0 844 Z"
+          fill="url(#groundGrad)"/>
+    <!-- Ground highlight -->
+    <path d="M0 740 Q100 715 195 728 Q290 741 390 722"
+          stroke="#A5D65E" stroke-width="6" fill="none" opacity="0.5"/>
+
+    <!-- Small flowers on ground -->
+    <g opacity="0.85">
+      <circle cx="44"  cy="762" r="5"  fill="#FFD54F"/>
+      <circle cx="44"  cy="762" r="2"  fill="#FFF"/>
+      <circle cx="82"  cy="774" r="4"  fill="#FF9FB2"/>
+      <circle cx="82"  cy="774" r="1.5" fill="#FFF"/>
+      <circle cx="150" cy="758" r="4"  fill="#FFD54F"/>
+      <circle cx="150" cy="758" r="1.5" fill="#FFF"/>
+      <circle cx="280" cy="748" r="5"  fill="#FF9FB2"/>
+      <circle cx="280" cy="748" r="2"  fill="#FFF"/>
+      <circle cx="340" cy="760" r="4"  fill="#FFD54F"/>
+      <circle cx="340" cy="760" r="1.5" fill="#FFF"/>
+    </g>
+  </svg>
+
+  <!-- ── LAYER 2: Tree scene (tree + owl + apples) ─────────── -->
+  <svg id="tree-scene" viewBox="0 0 390 844"
+       xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="appleGlowGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%"   stop-color="#FFD580" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="#FFD580" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="appleBodyGrad" cx="38%" cy="34%" r="62%">
+        <stop offset="0%"   stop-color="#FF7A72"/>
+        <stop offset="100%" stop-color="#C0392B"/>
+      </radialGradient>
+      <filter id="leafShadow">
+        <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.18"/>
+      </filter>
+    </defs>
+
+    <!-- Tree trunk -->
+    <rect x="168" y="490" width="54" height="310" rx="27" ry="27"
+          fill="#795548"/>
+    <!-- Trunk shadow stripe -->
+    <rect x="194" y="490" width="14" height="310" rx="7"
+          fill="#4E342E" opacity="0.38"/>
+    <!-- Trunk highlight -->
+    <rect x="172" y="500" width="8" height="260" rx="4"
+          fill="#A07040" opacity="0.25"/>
+
+    <!-- Tree canopy – rear center blob -->
+    <ellipse cx="195" cy="340" rx="118" ry="138" fill="#6AAF5E"/>
+    <!-- Left cluster -->
+    <ellipse cx="120" cy="388" rx="86"  ry="104" fill="#6AAF5E"/>
+    <!-- Right cluster -->
+    <ellipse cx="272" cy="378" rx="88"  ry="100" fill="#72B864"/>
+    <!-- Front center -->
+    <ellipse cx="195" cy="410" rx="76"  ry="82"  fill="#78C06A"/>
+    <!-- Highlight sheen blobs (Toca Boca gloss) -->
+    <ellipse cx="148" cy="286" rx="46"  ry="36"  fill="#92D479" opacity="0.58"/>
+    <ellipse cx="230" cy="308" rx="28"  ry="20"  fill="#A8E08A" opacity="0.38"/>
+    <ellipse cx="118" cy="355" rx="28"  ry="22"  fill="#92D479" opacity="0.38"/>
+
+    <!-- Branch arm -->
+    <path d="M222 400 Q278 376 368 364"
+          stroke="#795548" stroke-width="20" stroke-linecap="round" fill="none"/>
+    <!-- Branch underside shadow -->
+    <path d="M224 408 Q280 384 368 372"
+          stroke="#4E342E" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.38"/>
+    <!-- Branch highlight -->
+    <path d="M222 397 Q278 373 368 361"
+          stroke="#A07040" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.3"/>
+
+    <!-- Owl hollow (dark cavity in trunk) -->
+    <ellipse cx="195" cy="494" rx="34" ry="30" fill="#3E2723"/>
+    <ellipse cx="195" cy="494" rx="28" ry="24" fill="#2D1B14"/>
+
+    <!-- ── OWL ─────────────────────────────────────────────── -->
+    <g id="owl" transform="translate(195, 484)">
+      <!-- Wings (behind body) -->
+      <ellipse cx="-26" cy="8"  rx="10" ry="18" fill="#8D6035"
+               transform="rotate(-12 -26 8)"/>
+      <ellipse cx="26"  cy="8"  rx="10" ry="18" fill="#8D6035"
+               transform="rotate(12 26 8)"/>
+      <!-- Wing highlights -->
+      <ellipse cx="-24" cy="4"  rx="4"  ry="8"  fill="#B07A45" opacity="0.55"
+               transform="rotate(-12 -24 4)"/>
+      <ellipse cx="24"  cy="4"  rx="4"  ry="8"  fill="#B07A45" opacity="0.55"
+               transform="rotate(12 24 4)"/>
+      <!-- Body -->
+      <ellipse cx="0" cy="1" rx="30" ry="32" fill="#F5E6C8"/>
+      <!-- Ear tufts -->
+      <ellipse cx="-15" cy="-30" rx="8"  ry="12" fill="#8D6035"
+               transform="rotate(-18 -15 -30)"/>
+      <ellipse cx="15"  cy="-30" rx="8"  ry="12" fill="#8D6035"
+               transform="rotate(18 15 -30)"/>
+      <!-- Ear tuft highlights -->
+      <ellipse cx="-14" cy="-32" rx="3"  ry="5"  fill="#B07A45" opacity="0.45"
+               transform="rotate(-18 -14 -32)"/>
+      <ellipse cx="14"  cy="-32" rx="3"  ry="5"  fill="#B07A45" opacity="0.45"
+               transform="rotate(18 14 -32)"/>
+      <!-- Face disc -->
+      <ellipse cx="0" cy="-2" rx="22" ry="24" fill="#FFF3DC"/>
+      <!-- Eyes: outer rings -->
+      <circle cx="-10" cy="-6" r="9"  fill="#FFFAE8"/>
+      <circle cx="10"  cy="-6" r="9"  fill="#FFFAE8"/>
+      <!-- Eye rings (golden) -->
+      <circle cx="-10" cy="-6" r="9"  fill="none" stroke="#F9C84A" stroke-width="2" opacity="0.6"/>
+      <circle cx="10"  cy="-6" r="9"  fill="none" stroke="#F9C84A" stroke-width="2" opacity="0.6"/>
+      <!-- Pupils -->
+      <circle class="owl-pupil-l" cx="-10" cy="-6" r="5.5" fill="#2C1A0E"/>
+      <circle class="owl-pupil-r" cx="10"  cy="-6" r="5.5" fill="#2C1A0E"/>
+      <!-- Eye shine dots -->
+      <circle cx="-8"  cy="-8" r="2"  fill="white"/>
+      <circle cx="12"  cy="-8" r="2"  fill="white"/>
+      <!-- Small secondary shine -->
+      <circle cx="-13" cy="-5" r="1"  fill="white" opacity="0.7"/>
+      <circle cx="7"   cy="-5" r="1"  fill="white" opacity="0.7"/>
+      <!-- Beak -->
+      <path d="M-5 4 Q0 11 5 4 Q0 7 -5 4Z" fill="#F9A825"/>
+      <!-- Beak highlight -->
+      <path d="M-2 5 Q0 8 2 5" stroke="#FFC947" stroke-width="1" fill="none" opacity="0.7"/>
+      <!-- Mouth (swap d via JS) -->
+      <path id="owl-mouth" d="M-8 10 Q0 16 8 10"
+            stroke="#8D6035" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <!-- Blush cheeks -->
+      <circle cx="-20" cy="6"  r="7" fill="#E8534A" opacity="0.18"/>
+      <circle cx="20"  cy="6"  r="7" fill="#E8534A" opacity="0.18"/>
+      <!-- Belly texture dots -->
+      <circle cx="-6"  cy="14" r="2.5" fill="#EDD9B0" opacity="0.6"/>
+      <circle cx="0"   cy="18" r="2.5" fill="#EDD9B0" opacity="0.6"/>
+      <circle cx="6"   cy="14" r="2.5" fill="#EDD9B0" opacity="0.6"/>
+    </g>
+
+    <!-- ── APPLES (5 total, on branch) ───────────────────── -->
+    <!-- Apple positions: hanging below branch attachment points -->
+
+    <!-- Apple 0 -->
+    <g class="apple apple-0" transform="translate(248,412)">
+      <g class="apple-inner">
+        <circle class="apple-glow" cx="0" cy="0" r="28" fill="url(#appleGlowGrad)"/>
+        <ellipse cx="0" cy="2"   rx="18" ry="21" fill="url(#appleBodyGrad)"/>
+        <ellipse cx="-7" cy="-7" rx="7"  ry="5"  fill="#FFABA7" opacity="0.82"
+                 transform="rotate(-22 -7 -7)"/>
+        <path d="M0 -19 Q3 -28 1 -33" stroke="#6D4C41" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <ellipse cx="3" cy="-28" rx="5.5" ry="3" fill="#6AAF5E"
+                 transform="rotate(32 3 -28)"/>
+      </g>
+    </g>
+
+    <!-- Apple 1 -->
+    <g class="apple apple-1" transform="translate(278,404)">
+      <g class="apple-inner">
+        <circle class="apple-glow" cx="0" cy="0" r="28" fill="url(#appleGlowGrad)"/>
+        <ellipse cx="0" cy="2"   rx="18" ry="21" fill="url(#appleBodyGrad)"/>
+        <ellipse cx="-7" cy="-7" rx="7"  ry="5"  fill="#FFABA7" opacity="0.82"
+                 transform="rotate(-22 -7 -7)"/>
+        <path d="M0 -19 Q3 -28 1 -33" stroke="#6D4C41" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <ellipse cx="3" cy="-28" rx="5.5" ry="3" fill="#6AAF5E"
+                 transform="rotate(32 3 -28)"/>
+      </g>
+    </g>
+
+    <!-- Apple 2 -->
+    <g class="apple apple-2" transform="translate(306,396)">
+      <g class="apple-inner">
+        <circle class="apple-glow" cx="0" cy="0" r="28" fill="url(#appleGlowGrad)"/>
+        <ellipse cx="0" cy="2"   rx="18" ry="21" fill="url(#appleBodyGrad)"/>
+        <ellipse cx="-7" cy="-7" rx="7"  ry="5"  fill="#FFABA7" opacity="0.82"
+                 transform="rotate(-22 -7 -7)"/>
+        <path d="M0 -19 Q3 -28 1 -33" stroke="#6D4C41" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <ellipse cx="3" cy="-28" rx="5.5" ry="3" fill="#6AAF5E"
+                 transform="rotate(32 3 -28)"/>
+      </g>
+    </g>
+
+    <!-- Apple 3 -->
+    <g class="apple apple-3" transform="translate(334,390)">
+      <g class="apple-inner">
+        <circle class="apple-glow" cx="0" cy="0" r="28" fill="url(#appleGlowGrad)"/>
+        <ellipse cx="0" cy="2"   rx="18" ry="21" fill="url(#appleBodyGrad)"/>
+        <ellipse cx="-7" cy="-7" rx="7"  ry="5"  fill="#FFABA7" opacity="0.82"
+                 transform="rotate(-22 -7 -7)"/>
+        <path d="M0 -19 Q3 -28 1 -33" stroke="#6D4C41" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <ellipse cx="3" cy="-28" rx="5.5" ry="3" fill="#6AAF5E"
+                 transform="rotate(32 3 -28)"/>
+      </g>
+    </g>
+
+    <!-- Apple 4 -->
+    <g class="apple apple-4" transform="translate(360,384)">
+      <g class="apple-inner">
+        <circle class="apple-glow" cx="0" cy="0" r="28" fill="url(#appleGlowGrad)"/>
+        <ellipse cx="0" cy="2"   rx="18" ry="21" fill="url(#appleBodyGrad)"/>
+        <ellipse cx="-7" cy="-7" rx="7"  ry="5"  fill="#FFABA7" opacity="0.82"
+                 transform="rotate(-22 -7 -7)"/>
+        <path d="M0 -19 Q3 -28 1 -33" stroke="#6D4C41" stroke-width="2.5"
+              stroke-linecap="round" fill="none"/>
+        <ellipse cx="3" cy="-28" rx="5.5" ry="3" fill="#6AAF5E"
+                 transform="rotate(32 3 -28)"/>
+      </g>
+    </g>
+
+    <!-- Ground grass tufts (above ground in tree layer for layering) -->
+    <g opacity="0.7">
+      <path d="M10 790 Q14 774 18 790"  stroke="#6AAF5E" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M20 788 Q24 770 28 788"  stroke="#78C06A" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M60 784 Q64 770 68 784"  stroke="#6AAF5E" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M100 788 Q104 772 108 788" stroke="#6AAF5E" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M290 756 Q294 740 298 756" stroke="#6AAF5E" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M350 768 Q354 752 358 768" stroke="#78C06A" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M370 774 Q374 758 378 774" stroke="#6AAF5E" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+  </svg>
+
+  <!-- ── LAYER 3: Counter dots ─────────────────────────────── -->
+  <div id="counter-bar">
+    <svg viewBox="0 0 150 38" width="150" height="38" xmlns="http://www.w3.org/2000/svg">
+      <circle class="dot" id="dot-0" cx="15"  cy="19" r="13" fill="#E8534A"/>
+      <circle class="dot" id="dot-1" cx="45"  cy="19" r="13" fill="#E8534A"/>
+      <circle class="dot" id="dot-2" cx="75"  cy="19" r="13" fill="#E8534A"/>
+      <circle class="dot" id="dot-3" cx="105" cy="19" r="13" fill="#D9D9D9"/>
+      <circle class="dot" id="dot-4" cx="135" cy="19" r="13" fill="#D9D9D9"/>
+    </svg>
+  </div>
+
+  <!-- ── LAYER 4: Control buttons ──────────────────────────── -->
+  <div id="controls">
+
+    <!-- Plus button (sticks forming a cross) -->
+    <button id="btn-plus" aria-label="Add apple">
+      <svg viewBox="-22 -22 44 44" width="52" height="52" xmlns="http://www.w3.org/2000/svg">
+        <rect x="-5" y="-16" width="10" height="32" rx="5" fill="white"/>
+        <rect x="-16" y="-5" width="32" height="10" rx="5" fill="white"/>
+      </svg>
+    </button>
+
+    <!-- Minus button (leaf silhouette) -->
+    <button id="btn-minus" aria-label="Remove apple">
+      <svg viewBox="-22 -22 44 44" width="52" height="52" xmlns="http://www.w3.org/2000/svg">
+        <!-- Leaf body -->
+        <path d="M0 -17 C13 -11 17 0 11 13 Q0 20 -11 13 C-17 0 -13 -11 0 -17Z"
+              fill="white"/>
+        <!-- Midrib vein -->
+        <path d="M0 -14 Q1 0 0 15" stroke="#FFD54F" stroke-width="2.5"
+              fill="none" stroke-linecap="round"/>
+        <!-- Side veins -->
+        <path d="M0 -4 Q5 -1 9 4"  stroke="#FFD54F" stroke-width="1.5"
+              fill="none" stroke-linecap="round" opacity="0.75"/>
+        <path d="M0 -4 Q-5 -1 -9 4" stroke="#FFD54F" stroke-width="1.5"
+              fill="none" stroke-linecap="round" opacity="0.75"/>
+        <path d="M0 4 Q6 6 10 10"  stroke="#FFD54F" stroke-width="1.5"
+              fill="none" stroke-linecap="round" opacity="0.75"/>
+        <path d="M0 4 Q-6 6 -10 10" stroke="#FFD54F" stroke-width="1.5"
+              fill="none" stroke-linecap="round" opacity="0.75"/>
+      </svg>
+    </button>
+
+  </div>
+</div>
+
+<script>
+  /* ── State ──────────────────────────────────────────────── */
+  const state = {
+    count: 3,
+    animating: false,
+    MAX: 5,
+    MIN: 0
+  };
+
+  /* ── DOM refs ────────────────────────────────────────────── */
+  let apples, dots, owlEl, owlMouth, btnPlus, btnMinus, treeScene;
+
+  /* ── Mouth paths ─────────────────────────────────────────── */
+  const MOUTHS = {
+    happy: 'M-8 10 Q0 16 8 10',
+    sad:   'M-8 14 Q0 8 8 14',
+    idle:  'M-8 10 Q0 16 8 10'
+  };
+
+  /* ── Render helpers ──────────────────────────────────────── */
+  function renderApples() {
+    apples.forEach((a, i) => {
+      a.style.display = i < state.count ? '' : 'none';
+    });
+  }
+
+  function renderDots() {
+    dots.forEach((d, i) => {
+      d.setAttribute('fill', i < state.count ? '#E8534A' : '#D9D9D9');
+    });
+  }
+
+  function updateButtons() {
+    btnPlus.style.opacity  = state.count >= state.MAX ? '0.42' : '1';
+    btnMinus.style.opacity = state.count <= state.MIN ? '0.42' : '1';
+  }
+
+  /* ── Owl reactions ───────────────────────────────────────── */
+  function triggerOwl(mood) {
+    owlEl.classList.remove('owl-happy', 'owl-sad', 'owl-dance');
+    owlMouth.setAttribute('d', MOUTHS[mood] || MOUTHS.idle);
+    void owlEl.offsetWidth; // force reflow
+
+    const cls   = mood === 'dance' ? 'owl-dance'
+                : mood === 'happy' ? 'owl-happy'
+                : mood === 'sad'   ? 'owl-sad'
+                : null;
+    const dur   = mood === 'dance' ? 1100 : 680;
+
+    if (cls) {
+      owlEl.classList.add(cls);
+      setTimeout(() => {
+        owlEl.classList.remove(cls);
+        owlMouth.setAttribute('d', MOUTHS.idle);
+      }, dur);
+    }
+  }
+
+  /* ── Tree bop ────────────────────────────────────────────── */
+  function bopTree() {
+    treeScene.classList.remove('tree-bop');
+    void treeScene.offsetWidth;
+    treeScene.classList.add('tree-bop');
+    setTimeout(() => treeScene.classList.remove('tree-bop'), 450);
+  }
+
+  /* ── Add apple ───────────────────────────────────────────── */
+  function addApple() {
+    if (state.animating || state.count >= state.MAX) return;
+    state.animating = true;
+    btnPlus.style.pointerEvents  = 'none';
+    btnMinus.style.pointerEvents = 'none';
+
+    const idx     = state.count;
+    const appleEl = apples[idx];
+    const inner   = appleEl.querySelector('.apple-inner');
+
+    appleEl.style.display = '';
+
+    const anim = inner.animate([
+      { transform: 'translateY(-140px) scale(0.25)', opacity: '0'  },
+      { transform: 'translateY(16px)   scale(1.22)', opacity: '1', offset: 0.58 },
+      { transform: 'translateY(-8px)   scale(0.92)', opacity: '1', offset: 0.76 },
+      { transform: 'translateY(4px)    scale(1.04)', opacity: '1', offset: 0.90 },
+      { transform: 'translateY(0)      scale(1)',    opacity: '1'  }
+    ], { duration: 540, easing: 'ease-out', fill: 'forwards' });
+
+    anim.onfinish = () => {
+      inner.style.transform = '';
+      state.count++;
+      state.animating = false;
+      btnPlus.style.pointerEvents  = '';
+      btnMinus.style.pointerEvents = '';
+      renderDots();
+      updateButtons();
+      triggerOwl(state.count === state.MAX ? 'dance' : 'happy');
+      bopTree();
+    };
+  }
+
+  /* ── Remove apple ────────────────────────────────────────── */
+  function removeApple() {
+    if (state.animating || state.count <= state.MIN) return;
+    state.animating = true;
+    btnPlus.style.pointerEvents  = 'none';
+    btnMinus.style.pointerEvents = 'none';
+
+    const idx     = state.count - 1;
+    const appleEl = apples[idx];
+    const inner   = appleEl.querySelector('.apple-inner');
+
+    const anim = inner.animate([
+      { transform: 'translateY(0)   rotate(0deg)',   opacity: '1' },
+      { transform: 'translateY(70px) rotate(28deg)', opacity: '0' }
+    ], { duration: 390, easing: 'ease-in', fill: 'forwards' });
+
+    anim.onfinish = () => {
+      appleEl.style.display = 'none';
+      inner.style.transform = '';
+      inner.style.opacity   = '';
+      state.count--;
+      state.animating = false;
+      btnPlus.style.pointerEvents  = '';
+      btnMinus.style.pointerEvents = '';
+      renderDots();
+      updateButtons();
+      triggerOwl(state.count === state.MIN ? 'sad' : 'sad');
+      bopTree();
+    };
+  }
+
+  /* ── Scene scaling ───────────────────────────────────────── */
+  function scaleScene() {
+    const scene  = document.getElementById('scene');
+    const scaleX = window.innerWidth  / 390;
+    const scaleY = window.innerHeight / 844;
+    const scale  = Math.min(scaleX, scaleY);
+    scene.style.transform  = `scale(${scale})`;
+    const vOff = Math.max(0, (window.innerHeight - 844 * scale) / 2);
+    scene.style.marginTop  = vOff + 'px';
+    const hOff = Math.max(0, (window.innerWidth  - 390 * scale) / 2);
+    scene.style.marginLeft = hOff + 'px';
+  }
+
+  /* ── Init ────────────────────────────────────────────────── */
+  function init() {
+    apples    = Array.from(document.querySelectorAll('.apple'));
+    dots      = Array.from(document.querySelectorAll('.dot'));
+    owlEl     = document.getElementById('owl');
+    owlMouth  = document.getElementById('owl-mouth');
+    btnPlus   = document.getElementById('btn-plus');
+    btnMinus  = document.getElementById('btn-minus');
+    treeScene = document.getElementById('tree-scene');
+
+    renderApples();
+    renderDots();
+    updateButtons();
+
+    btnPlus.addEventListener('click',  addApple);
+    btnMinus.addEventListener('click', removeApple);
+    window.addEventListener('resize', scaleScene);
+    scaleScene();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+</script>
+
+</body>
+</html>
